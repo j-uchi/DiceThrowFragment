@@ -31,13 +31,21 @@ class FirstFragment : Fragment() {
     //手を離した位置の保持用
     var detach = 0f
 
-    //0=押下前　1=タッチ中 2=空中 3=着地後
-    var dicestate = 0
+    //ダイスの状態を保持する変数
+    var dice = state.Before
 
     var baseline = 0f
 
     //ダイスの画像保持用
     lateinit var img_dice: Array<Bitmap>
+
+    //ダイスの状態を管理する列挙型クラス
+    enum class state {
+        Before, Touch, Toss, After
+    }
+
+
+    //データクラスでダイス関係の変数を構造体にして扱う方が良さそう（1個しか投げないから不要といえば不要...？）
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -83,18 +91,18 @@ class FirstFragment : Fragment() {
             //画面を押下または移動したとき
             if (event.action == MotionEvent.ACTION_DOWN || event.action == MotionEvent.ACTION_MOVE) {
                 //ダイスが静止/押下中の処理
-                if (dicestate < 2) {
-                    //指の位置にダイスを追従させ、ダイスの状態はタップ中の「１」に設定
+                if (dice == state.Before || dice == state.Touch) {
+                    //指の位置にダイスを追従させ、ダイスの状態はtouchに設定
                     posY = event.y
-                    dicestate = 1
+                    dice = state.Touch
                 }
             }
             //画面から指を離したとき
             if (event.action == MotionEvent.ACTION_UP || event.action == MotionEvent.ACTION_CANCEL) {
                 //下に引っ張った状態且つダイスがタップ中の場合
                 //※ダイスが空中や停止後ステータスの場合は動かさない為
-                if (posY > baseline && dicestate == 1) {
-                    dicestate = 2
+                if (posY > baseline && dice == state.Touch) {
+                    dice = state.Toss
                     //初速を設定
                     v0 = (posY - baseline) * 1.5f
                     //最大初速を制限
@@ -103,10 +111,10 @@ class FirstFragment : Fragment() {
                     detach = posY
                 }
                 //上にある状態で手を離したら状態を戻す
-                else if (dicestate == 1) {
-                    dicestate = 0
+                else if (dice == state.Touch) {
+                    dice = state.Before
                     posY = baseline
-                    num=(0..5).random()
+                    num = (0..5).random()
                 }
             }
 
@@ -114,7 +122,7 @@ class FirstFragment : Fragment() {
         }
 
         view.post {
-            baseline=view.height/8*6f
+            baseline = view.height / 8 * 6f
         }
     }
 
@@ -127,30 +135,30 @@ class FirstFragment : Fragment() {
             override fun run() {
 
                 //ダイスの状態に
-                when (dicestate) {
+                when (dice) {
                     //投げる前
-                    0 -> {
+                    state.Before -> {
                         //位置を固定する（この行は必要ないけど一応）
                         posY = baseline
                     }
                     //タップ中
-                    1 -> {
+                    state.Touch -> {
                         //番号をランダムで入れ替える
                         num = (0..11).random()
                     }
                     //空中
-                    2 -> {
+                    state.Toss -> {
                         //番号をランダムで入れ替える
                         num = (0..11).random()
                         //時間を進める
-                        t += 1
+                        t += 2
                         //位置を移動する
                         posY = (detach - ((v0 * t - 0.5 * 9.8 * t * t)) / 5).toFloat()
                         //状態を確認する
                         state_check()
                     }
                     //投げた後
-                    3 -> {
+                    state.After -> {
 
                     }
                 }
@@ -164,7 +172,7 @@ class FirstFragment : Fragment() {
 
     //ダイス状態を初期化
     private fun dice_reset() {
-        dicestate = 0
+        dice = state.Before
         v0 = 0f
         t = 0
     }
@@ -176,11 +184,11 @@ class FirstFragment : Fragment() {
             //初速100以下の場合は静止
             if (v0 <= 100) {
                 posY = baseline
-                dicestate = 3
+                dice = state.After
                 //以下初期化処理
                 dice_reset()
                 //サイコロの状態は0~5でランダム設定。ここで確定する
-                num=(0..5).random()
+                num = (0..5).random()
             } else {//初速が100越えの場合は初速を半分にして反発
                 //反発したポジションを基準線に設定し、経過時間を0にする
                 posY = baseline
@@ -219,7 +227,7 @@ class FirstFragment : Fragment() {
             //20%になっているので全体の幅を5倍にすると通常幅、それの半分の位置にしたいので2.5倍
             canvas.drawBitmap(
                 img_dice[num],
-                width *2.5f - (img_dice[num].width / 2f),
+                width * 2.5f - (img_dice[num].width / 2f),
                 posY * 5 - img_dice[num].height / 2,
                 paint
             )
